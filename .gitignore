@@ -1,0 +1,15 @@
+*.pem
+
+# Rust Build Artifacts
+/target
+/wasm/target
+/meta/target
+
+# MultiversX Build Outputs
+output/*.wasm
+output/*.mxsc.json
+output/*.wat
+
+!output/*.abi.json
+
+.vscode/
