@@ -5,9 +5,9 @@
 ////////////////////////////////////////////////////
 
 // Init:                                 1
-// Endpoints:                            5
+// Endpoints:                            7
 // Async Callback (empty):               1
-// Total number of exported functions:   7
+// Total number of exported functions:   9
 
 #![no_std]
 
@@ -18,11 +18,13 @@ multiversx_sc_wasm_adapter::endpoints! {
     scheduled_payments_contract
     (
         init => init
-        createStream => create_stream
-        claim => claim
-        cancelStream => cancel_stream
-        getStream => streams
-        getLastStreamId => last_stream_id
+        createSubscription => create_subscription
+        triggerPayment => trigger_payment
+        cancelSubscription => cancel_subscription
+        getSubscription => subscriptions
+        getLastId => last_id
+        getClientSubscriptions => get_client_subscriptions
+        getVendorSubscriptions => get_vendor_subscriptions
     )
 }
 

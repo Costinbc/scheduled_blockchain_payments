@@ -1,56 +1,76 @@
 use multiversx_sc_scenario::*;
-use scheduled_payments_contract::*; // Name from Cargo.toml
+use scheduled_payments_contract::*; 
 use multiversx_sc_scenario::imports::BlockchainStateWrapper;
 
-
 #[test]
-fn simple_flow_test() {
+fn subscription_flow_test() {
     let mut blockchain = BlockchainStateWrapper::new();
     let owner_address = blockchain.create_user_account(&rust_biguint!(0));
-    let sender = blockchain.create_user_account(&rust_biguint!(0));
-    let recipient = blockchain.create_user_account(&rust_biguint!(0));
+    let client = blockchain.create_user_account(&rust_biguint!(0));
+    let vendor = blockchain.create_user_account(&rust_biguint!(0));
 
     // 1. Deploy Contract
     let contract_wrapper = blockchain.create_sc_account(
         &rust_biguint!(0),
-        Some(&owner_address), // fix: wrap in Some
+        Some(&owner_address),
         scheduled_payments_contract::contract_obj,
         "output/scheduled-payments-contract.wasm",
     );
-    
-    // let mut contract = contract_wrapper.contract_obj::<scheduled_payments_contract::ContractObj<DebugApi>>();
 
-    // 2. Setup Tokens for Sender
-    blockchain.set_esdt_balance(&sender, b"CASH-123456", &rust_biguint!(1000));
+    // 2. Setup Tokens for Client
+    // Client has 100 tokens
+    blockchain.set_esdt_balance(&client, b"USDC-123456", &rust_biguint!(100));
 
-    // 3. Create Stream (1000 tokens, from time 0 to 100)
+    // 3. Create Subscription
+    // Deposit: 60 USDC
+    // Cost: 10 USDC per cycle
+    // Frequency: 30 seconds (for testing)
     blockchain
         .execute_esdt_transfer(
-            &sender,
+            &client,
             &contract_wrapper,
-            b"CASH-123456",
+            b"USDC-123456",
             0,
-            &rust_biguint!(1000),
+            &rust_biguint!(60),
             |sc| {
-                sc.create_stream(
-                    recipient.clone().into(),
-                    0,   // Start Time
-                    100, // End Time
+                sc.create_subscription(
+                    vendor.clone().into(),
+                    rust_biguint!(10).into(), // FIX: Added .into() here
+                    30,                
                 );
             },
         )
         .assert_ok();
 
-    // 4. Warp Time Forward (50 seconds passed)
-    blockchain.set_block_timestamp(50);
-
-    // 5. Recipient Claims
+    // 4. Try to trigger payment IMMEDIATELY (Should fail, cycle not reached)
     blockchain
-        .execute_tx(&recipient, &contract_wrapper, &rust_biguint!(0), |sc| {
-            sc.claim(1); // Claim stream ID 1
+        .execute_tx(&vendor, &contract_wrapper, &rust_biguint!(0), |sc| {
+            sc.trigger_payment(1);
+        })
+        .assert_user_error("Payment cycle not reached yet");
+
+    // 5. Fast Forward 30 Seconds
+    blockchain.set_block_timestamp(30);
+
+    // 6. Vendor Triggers Payment (Should Success)
+    blockchain
+        .execute_tx(&vendor, &contract_wrapper, &rust_biguint!(0), |sc| {
+            sc.trigger_payment(1);
         })
         .assert_ok();
 
-    // 6. Verify Balance (Should have 500)
-    blockchain.check_esdt_balance(&recipient, b"CASH-123456", &rust_biguint!(500));
+    // 7. Check Vendor Balance (Should have 10)
+    blockchain.check_esdt_balance(&vendor, b"USDC-123456", &rust_biguint!(10));
+
+    // 8. Client Cancels
+    blockchain
+        .execute_tx(&client, &contract_wrapper, &rust_biguint!(0), |sc| {
+            sc.cancel_subscription(1);
+        })
+        .assert_ok();
+
+    // 9. Check Client Balance
+    // Started with 100. Sent 60. Got refunded 50 (60 - 10 payment).
+    // Should have 90.
+    blockchain.check_esdt_balance(&client, b"USDC-123456", &rust_biguint!(90));
 }
