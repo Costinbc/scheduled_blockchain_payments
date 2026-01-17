@@ -3,192 +3,157 @@
 multiversx_sc::imports!();
 multiversx_sc::derive_imports!();
 
-
-// 1. DATA STRUCTURE
-// We define the struct at the top level.
-// The derives will now function correctly.
 #[type_abi]
 #[derive(TopEncode, TopDecode, NestedEncode, NestedDecode, Clone, PartialEq)]
-pub struct Stream<M: ManagedTypeApi> {
-    pub sender: ManagedAddress<M>,
-    pub recipient: ManagedAddress<M>,
+pub struct Subscription<M: ManagedTypeApi> {
+    pub client: ManagedAddress<M>,
+    pub vendor: ManagedAddress<M>,
     pub token_identifier: TokenIdentifier<M>,
     
-    // Money Flow
-    pub total_deposit: BigUint<M>,      
-    pub claimed_amount: BigUint<M>,     
-    pub start_time: u64,                
-    pub end_time: u64,                  
+    // Subscription Terms
+    pub amount_per_cycle: BigUint<M>,   
+    pub frequency: u64,                 
     
-    // Status
-    pub is_paused: bool,                
-    pub cancellation_requested: bool,   
+    // State
+    pub remaining_balance: BigUint<M>,  
+    pub last_payment_time: u64,         
+    pub start_time: u64,                
 }
 
-// 2. CONTRACT
 #[multiversx_sc::contract]
-pub trait CashflowContract {
+pub trait SubscriptionContract {
     
     #[init]
     fn init(&self) {}
 
-    // --- ENDPOINTS ---
-
+    // 1. CLIENT: Create a Subscription (Deposits funds upfront)
     #[payable("*")]
-    #[endpoint(createStream)]
-    fn create_stream(
+    #[endpoint(createSubscription)]
+    fn create_subscription(
         &self,
-        recipient: ManagedAddress,
-        start_time: u64,
-        end_time: u64,
+        vendor: ManagedAddress,
+        amount_per_cycle: BigUint,
+        frequency: u64,
     ) -> u64 {
         let payment = self.call_value().single_esdt();
-        let payment_token = payment.token_identifier.clone();
-        let payment_amount = payment.amount.clone();
         
-        require!(payment_amount > 0, "Must send tokens");
-        require!(end_time > start_time, "End time must be after start time");
+        require!(payment.amount >= amount_per_cycle, "Deposit must cover at least one cycle");
+        require!(frequency > 0, "Frequency must be > 0");
 
-        let sender = self.blockchain().get_caller();
+        let client = self.blockchain().get_caller();
+        let current_time = self.blockchain().get_block_timestamp();
         
-        // Initialize the struct
-        let new_stream = Stream {
-            sender: sender.clone(),
-            recipient,
-            token_identifier: payment_token,
-            total_deposit: payment_amount,
-            claimed_amount: BigUint::zero(),
-            start_time,
-            end_time,
-            is_paused: false,
-            cancellation_requested: false,
+        // Create the Subscription Object
+        let new_sub = Subscription {
+            client: client.clone(),
+            vendor: vendor.clone(),
+            
+            // FIX: Added .clone() here
+            token_identifier: payment.token_identifier.clone(),
+            
+            amount_per_cycle: amount_per_cycle.clone(),
+            frequency,
+            
+            // FIX: Added .clone() here
+            remaining_balance: payment.amount.clone(),
+            
+            last_payment_time: current_time, 
+            start_time: current_time,
         };
 
-        let stream_id = self.last_stream_id().get() + 1;
-        self.last_stream_id().set(stream_id);
+        let sub_id = self.last_id().get() + 1;
+        self.last_id().set(sub_id);
 
-        // Store it
-        self.streams(stream_id).set(new_stream);
+        self.subscriptions(sub_id).set(&new_sub);
 
-        // Emit Event
-        self.create_stream_event(stream_id, &sender, (start_time, end_time));
+        // Indexing for Frontend
+        self.client_subscriptions(&client).push(&sub_id);
+        self.vendor_subscriptions(&vendor).push(&sub_id);
 
-        stream_id
+        sub_id
     }
 
-    #[endpoint(claim)]
-    fn claim(&self, stream_id: u64) {
-        // Use 'get()' to load from storage.
-        let mut stream = self.streams(stream_id).get();
+    // 2. VENDOR: Charge the Subscription
+    #[endpoint(triggerPayment)]
+    fn trigger_payment(&self, sub_id: u64) {
+        let mut sub = self.subscriptions(sub_id).get();
+        let current_time = self.blockchain().get_block_timestamp();
+
+        // 1. Check Cycle Logic
+        let next_payment_due = sub.last_payment_time + sub.frequency;
+        require!(current_time >= next_payment_due, "Payment cycle not reached yet");
+
+        // 2. Check Balance
+        require!(sub.remaining_balance >= sub.amount_per_cycle, "Insufficient funds for renewal");
+
+        // 3. Update State
+        sub.remaining_balance -= &sub.amount_per_cycle;
+        sub.last_payment_time = current_time; 
         
-        let caller = self.blockchain().get_caller();
-        require!(
-            caller == stream.recipient || caller == stream.sender, 
-            "Unauthorized"
-        );
+        self.subscriptions(sub_id).set(&sub);
 
-        let claimable = self.calculate_claimable_amount(&stream);
-        
-        // Return if nothing to claim
-        if claimable == 0 {
-            return;
-        }
-
-        stream.claimed_amount += &claimable;
-        self.streams(stream_id).set(&stream);
-
+        // 4. Send Payment to Vendor
         self.send().direct_esdt(
-            &stream.recipient,
-            &stream.token_identifier,
+            &sub.vendor,
+            &sub.token_identifier,
             0,
-            &claimable
+            &sub.amount_per_cycle
         );
     }
 
-    #[endpoint(cancelStream)]
-    fn cancel_stream(&self, stream_id: u64) {
-        let mut stream = self.streams(stream_id).get();
+    // 3. CLIENT: Cancel and Withdraw Remaining
+    #[endpoint(cancelSubscription)]
+    fn cancel_subscription(&self, sub_id: u64) {
+        let sub = self.subscriptions(sub_id).get();
         let caller = self.blockchain().get_caller();
 
-        require!(caller == stream.sender, "Only the sender can cancel");
-        require!(stream.end_time > 0, "Stream already cancelled or finished");
+        require!(caller == sub.client, "Only client can cancel");
 
-        // 1. Calculate what is owed up to NOW
-        let claimable_now = self.calculate_claimable_amount(&stream);
-
-        // 2. Distribute Funds
-        // A. Send Recipient their vested share (if any)
-        if claimable_now > 0 {
+        // Refund remaining balance
+        if sub.remaining_balance > 0 {
             self.send().direct_esdt(
-                &stream.recipient,
-                &stream.token_identifier,
+                &sub.client,
+                &sub.token_identifier,
                 0,
-                &claimable_now
-            );
-            stream.claimed_amount += &claimable_now;
-        }
-
-        // B. Send Sender the rest (Total Deposit - Total Claimed)
-        let remaining_balance = &stream.total_deposit - &stream.claimed_amount;
-        if remaining_balance > 0 {
-            self.send().direct_esdt(
-                &stream.sender,
-                &stream.token_identifier,
-                0,
-                &remaining_balance
+                &sub.remaining_balance
             );
         }
 
-        // 3. Clear storage (or mark as 0 end_time to signify closed)
-        // We set end_time to the current time effectively stopping the stream logic
-        let current_time = self.blockchain().get_block_timestamp();
-        stream.end_time = current_time; 
-        
-        // Save the final state (optional, or you can clear it to free storage bytes)
-        self.streams(stream_id).set(&stream);
+        // Delete subscription
+        self.subscriptions(sub_id).clear();
     }
 
-    // --- HELPERS ---
+    // --- VIEW FUNCTIONS ---
 
-    fn calculate_claimable_amount(&self, stream: &Stream<Self::Api>) -> BigUint {
-        let current_time = self.blockchain().get_block_timestamp();
-        
-        if current_time < stream.start_time {
-            return BigUint::zero();
+    #[view(getSubscription)]
+    #[storage_mapper("subscriptions")]
+    fn subscriptions(&self, id: u64) -> SingleValueMapper<Subscription<Self::Api>>;
+
+    #[view(getLastId)]
+    #[storage_mapper("lastId")]
+    fn last_id(&self) -> SingleValueMapper<u64>;
+
+    #[storage_mapper("clientSubscriptions")]
+    fn client_subscriptions(&self, address: &ManagedAddress) -> VecMapper<u64>;
+
+    #[storage_mapper("vendorSubscriptions")]
+    fn vendor_subscriptions(&self, address: &ManagedAddress) -> VecMapper<u64>;
+
+    #[view(getClientSubscriptions)]
+    fn get_client_subscriptions(&self, address: ManagedAddress) -> ManagedVec<u64> {
+        let mut out = ManagedVec::new();
+        for id in self.client_subscriptions(&address).iter() {
+            out.push(id);
         }
-
-        let duration = stream.end_time - stream.start_time;
-        let time_passed = if current_time > stream.end_time {
-            duration
-        } else {
-            current_time - stream.start_time
-        };
-
-        // Standard Linear Vesting
-        let total_vested = &stream.total_deposit * &BigUint::from(time_passed) / &BigUint::from(duration);
-        
-        if total_vested > stream.claimed_amount {
-             total_vested - &stream.claimed_amount
-        } else {
-             BigUint::zero()
-        }
+        out
     }
 
-    // --- STORAGE & EVENTS ---
-
-    #[view(getStream)]
-    #[storage_mapper("streams")]
-    fn streams(&self, id: u64) -> SingleValueMapper<Stream<Self::Api>>;
-
-    #[view(getLastStreamId)]
-    #[storage_mapper("lastStreamId")]
-    fn last_stream_id(&self) -> SingleValueMapper<u64>;
-
-    #[event("createStream")]
-    fn create_stream_event(
-        &self, 
-        #[indexed] id: u64, 
-        #[indexed] sender: &ManagedAddress, 
-        times: (u64, u64)
-    );
+    #[view(getVendorSubscriptions)]
+    fn get_vendor_subscriptions(&self, address: ManagedAddress) -> ManagedVec<u64> {
+        let mut out = ManagedVec::new();
+        for id in self.vendor_subscriptions(&address).iter() {
+            out.push(id);
+        }
+        out
+    }
 }

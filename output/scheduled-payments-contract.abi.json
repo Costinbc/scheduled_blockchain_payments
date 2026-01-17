@@ -16,29 +16,29 @@
             "version": "0.62.1"
         }
     },
-    "name": "CashflowContract",
+    "name": "SubscriptionContract",
     "constructor": {
         "inputs": [],
         "outputs": []
     },
     "endpoints": [
         {
-            "name": "createStream",
+            "name": "createSubscription",
             "mutability": "mutable",
             "payableInTokens": [
                 "*"
             ],
             "inputs": [
                 {
-                    "name": "recipient",
+                    "name": "vendor",
                     "type": "Address"
                 },
                 {
-                    "name": "start_time",
-                    "type": "u64"
+                    "name": "amount_per_cycle",
+                    "type": "BigUint"
                 },
                 {
-                    "name": "end_time",
+                    "name": "frequency",
                     "type": "u64"
                 }
             ],
@@ -49,29 +49,29 @@
             ]
         },
         {
-            "name": "claim",
+            "name": "triggerPayment",
             "mutability": "mutable",
             "inputs": [
                 {
-                    "name": "stream_id",
+                    "name": "sub_id",
                     "type": "u64"
                 }
             ],
             "outputs": []
         },
         {
-            "name": "cancelStream",
+            "name": "cancelSubscription",
             "mutability": "mutable",
             "inputs": [
                 {
-                    "name": "stream_id",
+                    "name": "sub_id",
                     "type": "u64"
                 }
             ],
             "outputs": []
         },
         {
-            "name": "getStream",
+            "name": "getSubscription",
             "mutability": "readonly",
             "inputs": [
                 {
@@ -81,12 +81,12 @@
             ],
             "outputs": [
                 {
-                    "type": "Stream"
+                    "type": "Subscription"
                 }
             ]
         },
         {
-            "name": "getLastStreamId",
+            "name": "getLastId",
             "mutability": "readonly",
             "inputs": [],
             "outputs": [
@@ -94,25 +94,34 @@
                     "type": "u64"
                 }
             ]
-        }
-    ],
-    "events": [
+        },
         {
-            "identifier": "createStream",
+            "name": "getClientSubscriptions",
+            "mutability": "readonly",
             "inputs": [
                 {
-                    "name": "id",
-                    "type": "u64",
-                    "indexed": true
-                },
+                    "name": "address",
+                    "type": "Address"
+                }
+            ],
+            "outputs": [
                 {
-                    "name": "sender",
-                    "type": "Address",
-                    "indexed": true
-                },
+                    "type": "List<u64>"
+                }
+            ]
+        },
+        {
+            "name": "getVendorSubscriptions",
+            "mutability": "readonly",
+            "inputs": [
                 {
-                    "name": "times",
-                    "type": "tuple<u64,u64>"
+                    "name": "address",
+                    "type": "Address"
+                }
+            ],
+            "outputs": [
+                {
+                    "type": "List<u64>"
                 }
             ]
         }
@@ -120,15 +129,15 @@
     "esdtAttributes": [],
     "hasCallback": false,
     "types": {
-        "Stream": {
+        "Subscription": {
             "type": "struct",
             "fields": [
                 {
-                    "name": "sender",
+                    "name": "client",
                     "type": "Address"
                 },
                 {
-                    "name": "recipient",
+                    "name": "vendor",
                     "type": "Address"
                 },
                 {
@@ -136,28 +145,24 @@
                     "type": "TokenIdentifier"
                 },
                 {
-                    "name": "total_deposit",
+                    "name": "amount_per_cycle",
                     "type": "BigUint"
                 },
                 {
-                    "name": "claimed_amount",
+                    "name": "frequency",
+                    "type": "u64"
+                },
+                {
+                    "name": "remaining_balance",
                     "type": "BigUint"
+                },
+                {
+                    "name": "last_payment_time",
+                    "type": "u64"
                 },
                 {
                     "name": "start_time",
                     "type": "u64"
-                },
-                {
-                    "name": "end_time",
-                    "type": "u64"
-                },
-                {
-                    "name": "is_paused",
-                    "type": "bool"
-                },
-                {
-                    "name": "cancellation_requested",
-                    "type": "bool"
                 }
             ]
         }
