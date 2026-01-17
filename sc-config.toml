@@ -1,0 +1,4 @@
+
+
+[[proxy]]
+path = "interactor/src/scheduled_payments_contract_proxy.rs"
