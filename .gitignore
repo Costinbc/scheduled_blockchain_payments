@@ -13,3 +13,4 @@ output/*.wat
 !output/*.abi.json
 
 .vscode/
+node_modules/

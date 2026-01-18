@@ -1,0 +1,270 @@
+{
+  "buildInfo": {
+    "rustc": {
+      "version": "1.90.0",
+      "commitHash": "1159e78c4747b02ef996e55082b704c09b970588",
+      "commitDate": "2025-09-14",
+      "channel": "Stable",
+      "short": "rustc 1.90.0 (1159e78c4 2025-09-14)"
+    },
+    "contractCrate": {
+      "name": "scheduled-payments-contract",
+      "version": "0.0.0"
+    },
+    "framework": {
+      "name": "multiversx-sc",
+      "version": "0.62.1"
+    }
+  },
+  "name": "SubscriptionContract",
+  "constructor": {
+    "inputs": [],
+    "outputs": []
+  },
+  "endpoints": [
+    {
+      "name": "registerAsUser",
+      "mutability": "mutable",
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "name": "registerAsProvider",
+      "mutability": "mutable",
+      "inputs": [],
+      "outputs": []
+    },
+    {
+      "name": "createService",
+      "mutability": "mutable",
+      "inputs": [
+        { "name": "name", "type": "bytes" },
+        { "name": "description", "type": "bytes" },
+        { "name": "amount_per_cycle", "type": "BigUint" },
+        { "name": "frequency_in_blocks", "type": "u64" },
+        {
+          "name": "opt_token_id",
+          "type": "optional<EgldOrEsdtTokenIdentifier>",
+          "multi_arg": true
+        }
+      ],
+      "outputs": [
+        { "type": "u64" }
+      ]
+    },
+    {
+      "name": "deactivateService",
+      "mutability": "mutable",
+      "inputs": [
+        { "name": "service_id", "type": "u64" }
+      ],
+      "outputs": []
+    },
+    {
+      "name": "subscribe",
+      "mutability": "mutable",
+      "payableInTokens": ["*"],
+      "inputs": [
+        { "name": "service_id", "type": "u64" }
+      ],
+      "outputs": [
+        { "type": "u64" }
+      ]
+    },
+    {
+      "name": "topUp",
+      "mutability": "mutable",
+      "payableInTokens": ["*"],
+      "inputs": [
+        { "name": "sub_id", "type": "u64" }
+      ],
+      "outputs": []
+    },
+    {
+      "name": "cancelSubscriptionByUser",
+      "mutability": "mutable",
+      "inputs": [
+        { "name": "sub_id", "type": "u64" }
+      ],
+      "outputs": []
+    },
+    {
+      "name": "cancelSubscriptionByProvider",
+      "mutability": "mutable",
+      "inputs": [
+        { "name": "sub_id", "type": "u64" }
+      ],
+      "outputs": []
+    },
+    {
+      "name": "triggerPayment",
+      "mutability": "mutable",
+      "inputs": [
+        { "name": "sub_id", "type": "u64" }
+      ],
+      "outputs": []
+    },
+    {
+      "name": "finalizeCancellation",
+      "mutability": "mutable",
+      "inputs": [
+        { "name": "sub_id", "type": "u64" }
+      ],
+      "outputs": []
+    },
+    {
+      "name": "getService",
+      "mutability": "readonly",
+      "inputs": [
+        { "name": "id", "type": "u64" }
+      ],
+      "outputs": [
+        { "type": "Service" }
+      ]
+    },
+    {
+      "name": "getSubscription",
+      "mutability": "readonly",
+      "inputs": [
+        { "name": "id", "type": "u64" }
+      ],
+      "outputs": [
+        { "type": "Subscription" }
+      ]
+    },
+    {
+      "name": "getAllServiceIds",
+      "mutability": "readonly",
+      "inputs": [],
+      "outputs": [
+        { "type": "List<u64>" }
+      ]
+    },
+    {
+      "name": "getProviderServices",
+      "mutability": "readonly",
+      "inputs": [
+        { "name": "address", "type": "Address" }
+      ],
+      "outputs": [
+        { "type": "List<u64>" }
+      ]
+    },
+    {
+      "name": "getUserSubscriptions",
+      "mutability": "readonly",
+      "inputs": [
+        { "name": "address", "type": "Address" }
+      ],
+      "outputs": [
+        { "type": "List<u64>" }
+      ]
+    },
+    {
+      "name": "getProviderSubscriptions",
+      "mutability": "readonly",
+      "inputs": [
+        { "name": "address", "type": "Address" }
+      ],
+      "outputs": [
+        { "type": "List<u64>" }
+      ]
+    },
+    {
+      "name": "getServiceSubscriptions",
+      "mutability": "readonly",
+      "inputs": [
+        { "name": "service_id", "type": "u64" }
+      ],
+      "outputs": [
+        { "type": "List<u64>" }
+      ]
+    },
+    {
+      "name": "getSubscriptionPaymentInfo",
+      "mutability": "readonly",
+      "inputs": [
+        { "name": "sub_id", "type": "u64" }
+      ],
+      "outputs": [
+        {
+          "type": "tuple<u8,u64,BigUint,BigUint>",
+          "multi_result": true
+        }
+      ]
+    },
+    {
+      "name": "getSubscriptionState",
+      "mutability": "readonly",
+      "inputs": [
+        { "name": "sub_id", "type": "u64" }
+      ],
+      "outputs": [
+        {
+          "type": "tuple<u8,u64,u64>",
+          "multi_result": true
+        }
+      ]
+    },
+    {
+      "name": "getUserRole",
+      "mutability": "readonly",
+      "inputs": [
+        { "name": "address", "type": "Address" }
+      ],
+      "outputs": [
+        { "type": "u8" }
+      ]
+    },
+    {
+      "name": "getLastServiceId",
+      "mutability": "readonly",
+      "inputs": [],
+      "outputs": [
+        { "type": "u64" }
+      ]
+    },
+    {
+      "name": "getLastSubscriptionId",
+      "mutability": "readonly",
+      "inputs": [],
+      "outputs": [
+        { "type": "u64" }
+      ]
+    }
+  ],
+  "esdtAttributes": [],
+  "hasCallback": false,
+  "types": {
+    "Service": {
+      "type": "struct",
+      "fields": [
+        { "name": "id", "type": "u64" },
+        { "name": "provider", "type": "Address" },
+        { "name": "name", "type": "bytes" },
+        { "name": "description", "type": "bytes" },
+        { "name": "token_identifier", "type": "EgldOrEsdtTokenIdentifier" },
+        { "name": "amount_per_cycle", "type": "BigUint" },
+        { "name": "frequency_in_blocks", "type": "u64" },
+        { "name": "active", "type": "bool" }
+      ]
+    },
+    "Subscription": {
+      "type": "struct",
+      "fields": [
+        { "name": "id", "type": "u64" },
+        { "name": "service_id", "type": "u64" },
+        { "name": "client", "type": "Address" },
+        { "name": "vendor", "type": "Address" },
+        { "name": "token_identifier", "type": "EgldOrEsdtTokenIdentifier" },
+        { "name": "amount_per_cycle", "type": "BigUint" },
+        { "name": "frequency_in_blocks", "type": "u64" },
+        { "name": "remaining_balance", "type": "BigUint" },
+        { "name": "last_payment_block", "type": "u64" },
+        { "name": "next_payment_block", "type": "u64" },
+        { "name": "status", "type": "u8" },
+        { "name": "cancel_effective_block", "type": "u64" }
+      ]
+    }
+  }
+}
