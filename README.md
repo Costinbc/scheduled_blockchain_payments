@@ -16,13 +16,12 @@ cd /scheduled_blockchain_payments/meta
 cargo run build
 ```
 
-Deploy using your preferred MultiversX tooling (devnet). After deployment, copy the
-new contract address into:
+Deploy using your preferred MultiversX tooling (devnet).
 
 ```bash
- mxpy contract deploy     --bytecode="output/scheduled-payments-contract.wasm"     --pem="/pem/path"     --gas-limit=50000000     --proxy="https://devnet-gateway.multiversx.com"     --chain="D"     --send
+ mxpy contract deploy     --bytecode="output/scheduled-payments-contract.wasm"     --pem="</pem/path>"     --gas-limit=50000000     --proxy="https://devnet-gateway.multiversx.com"     --chain="D"     --send
  ```
-
+After deployment, copy the new contract address into:
 - `dapp/src/config/config.devnet.ts`
 - `scheduler/config.py`
 
@@ -55,7 +54,7 @@ python3 scheduler.py
 
 ## Dapp (install + run)
 ```bash
-cd /Users/dandronic/to_be_deleted/BDPA/scheduled_blockchain_payments/dapp
+cd scheduled_blockchain_payments/dapp
 npm install --global pnpm
 pnpm install
 pnpm start-devnet
