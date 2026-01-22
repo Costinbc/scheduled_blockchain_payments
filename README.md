@@ -12,7 +12,7 @@ Subscription-based scheduled payments platform on MultiversX.
 Build the contract and ABI:
 
 ```bash
-cd /scheduled_blockchain_payments
+cd /scheduled_blockchain_payments/meta
 cargo run build
 ```
 
